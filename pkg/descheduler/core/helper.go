@@ -100,6 +100,7 @@ func (h *SchedulingResultHelper) GetUndesiredClusters() ([]*TargetClusterWrapper
 	var clusters []*TargetClusterWrapper
 	var names []string
 	for _, cluster := range h.TargetClusters {
+		klog.Infof("Checking cluster (%s) with ready replicas (%d) and spec replicas(%d)")
 		if cluster.Ready < cluster.Spec {
 			clusters = append(clusters, cluster)
 			names = append(names, cluster.ClusterName)
@@ -126,11 +127,26 @@ func getReadyReplicas(binding *workv1alpha2.ResourceBinding) map[string]int32 {
 			continue
 		}
 
+		// For now we can use the health of the flinkdeployment as a measure for descheduling
+		// Ideally we should plug into the custom resource interpreter like described in line 140
+		klog.Info("Checking health of resource binding %s of type %s", binding.Name, binding.Kind)
+		if binding.Kind == "FlinkDeployment" {
+			if item.Health == workv1alpha2.ResourceUnhealthy {
+				klog.Info("FlinkDeployment unhealthy!!")
+				res[item.ClusterName] = 0
+			} else {
+				klog.Info("FlinkDeployment healthy.")
+				res[item.ClusterName] = 1
+			}
+			return res
+		}
+
 		workloadStatus := make(map[string]interface{})
 		if err := json.Unmarshal(item.Status.Raw, &workloadStatus); err != nil {
 			klog.ErrorS(err, "Failed to unmarshal workload status when get ready replicas", "ResourceBinding", klog.KObj(binding))
 			continue
 		}
+
 		readyReplicas := int32(0)
 		// TODO(Garrybest): cooperate with custom resource interpreter
 		if r, ok := workloadStatus[util.ReadyReplicasField]; ok {

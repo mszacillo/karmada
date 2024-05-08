@@ -155,6 +155,8 @@ const (
 
 // Define resource kind.
 const (
+	// FlinkDeployment kind
+	FlinkDeploymentKind = "FlinkDeployment"
 	// DeploymentKind indicates the target resource is a deployment
 	DeploymentKind = "Deployment"
 	// ServiceKind indicates the target resource is a service

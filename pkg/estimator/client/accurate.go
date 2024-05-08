@@ -119,6 +119,11 @@ func (se *SchedulerEstimator) maxUnscheduableReplicas(
 		return UnauthenticReplica, err
 	}
 
+	// Req will have the resource information included -
+	// Unsure if we can pack status into the req info, but that would be nice, that way we can decide if the replica
+	// is unschedulable via the status
+	// Otherwise we can parse the FlinkDeployment name and use K8's client to grab the resource
+	// But that will require that we define the FlinkDeployment struct in golang :(
 	req := &pb.UnschedulableReplicasRequest{
 		Cluster: cluster,
 		Resource: pb.ObjectReference{

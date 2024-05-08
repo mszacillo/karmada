@@ -28,6 +28,8 @@ import (
 // TODO(Garrybest): make it as an option
 var supportedGVKs = []schema.GroupVersionKind{
 	appsv1.SchemeGroupVersion.WithKind("Deployment"),
+	// Adding FlinkDeployment
+	schema.GroupVersionKind{Group: "flink.apache.org", Version: "v1beta1", Kind: "FlinkDeployment"},
 }
 
 // FilterBindings will filter ResourceBindings that could be descheduled

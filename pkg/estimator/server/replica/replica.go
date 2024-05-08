@@ -62,6 +62,11 @@ func GetUnschedulablePodsOfWorkload(unstructObj *unstructured.Unstructured, thre
 				unschedulable++
 			}
 		}
+	case util.FlinkDeploymentKind:
+		// We have the resource name ... could use client here to grab workload status.
+		// ToDo: Need to look into if there is an existing go library for interacting with FlinkDeployment objects
+		// Lyft has a flinkonk8soperator library written in Go: https://pkg.go.dev/github.com/lyft/flinkk8soperator
+		// But what if there are breaking changes between the lyft library and upstream apache repo - ugh
 	default:
 		// TODO(Garrybest): add abstract workload
 		return 0, fmt.Errorf("kind(%s) of workload(%s) is not supported", unstructObj.GetKind(), klog.KObj(unstructObj).String())

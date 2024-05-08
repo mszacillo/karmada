@@ -156,6 +156,7 @@ func (d *Descheduler) descheduleOnce() {
 	}
 	bindings = core.FilterBindings(bindings)
 	for _, binding := range bindings {
+		klog.Infof("Now queuing resourcebinding %s.", binding.Name)
 		d.deschedulerWorker.Enqueue(binding)
 	}
 }
