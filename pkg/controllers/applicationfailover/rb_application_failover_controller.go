@@ -20,13 +20,16 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"reflect"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 	controllerruntime "sigs.k8s.io/controller-runtime"
@@ -152,8 +155,59 @@ func (c *RBApplicationFailoverController) syncBinding(binding *workv1alpha2.Reso
 	return time.Duration(duration) * time.Second, nil
 }
 
+func (c *RBApplicationFailoverController) updateFailoverStatus(binding *workv1alpha2.ResourceBinding, cluster string) (err error) {
+	message := fmt.Sprintf("Failover triggered for replica on cluster %s", cluster)
+	newFailoverAppliedCondition := metav1.Condition{
+		Type:               workv1alpha2.EvictionReasonApplicationFailure,
+		Status:             metav1.ConditionTrue,
+		Reason:             "FailoverSuccessful",
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+	}
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
+		currentTime := metav1.Now()
+		binding.Status.LastFailoverTime = &currentTime
+		bindingStatus := binding.Status.DeepCopy()
+		meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
+		if reflect.DeepEqual(*bindingStatus, binding.Status) {
+			return nil
+		}
+
+		klog.V(4).Info("Calling K8s cluster to update status...")
+
+		updateErr := c.Client.Status().Update(context.TODO(), binding)
+		if updateErr == nil {
+			klog.V(4).Info("Called K8s cluster to update status!")
+			return nil
+		}
+
+		klog.V(4).Info("Verifying the update was persisted...")
+
+		updated := &workv1alpha2.ResourceBinding{}
+		if err = c.Client.Get(context.TODO(), client.ObjectKey{Namespace: binding.GetNamespace(), Name: binding.GetName()}, updated); err == nil {
+			klog.V(4).Info("Found binding...")
+			binding = updated.DeepCopy()
+		} else {
+			klog.Errorf("Failed to get updated resource binding %s/%s: %v", binding.GetNamespace(), binding.GetName(), err)
+		}
+		return updateErr
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
 func (c *RBApplicationFailoverController) evictBinding(binding *workv1alpha2.ResourceBinding, clusters []string) error {
 	for _, cluster := range clusters {
+		klog.V(4).Info("Updating resource binding with latest failover timestamp for cluster %s.", cluster)
+		updateerr := c.updateFailoverStatus(binding, cluster)
+		if updateerr != nil {
+			klog.Errorf("Failed to update status with failover timestamp!!!")
+		}
 		switch binding.Spec.Failover.Application.PurgeMode {
 		case policyv1alpha1.Graciously:
 			if features.FeatureGate.Enabled(features.GracefulEviction) {

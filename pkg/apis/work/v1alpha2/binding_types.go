@@ -312,6 +312,11 @@ type ResourceBindingStatus struct {
 	// +optional
 	LastScheduledTime *metav1.Time `json:"lastScheduledTime,omitempty"`
 
+	// LastFailoverTime represents the latest timestamp when a workload was failed over.
+	// It is represented in RFC3339 form (like '2006-01-02T15:04:05Z') and is in UTC.
+	// +optional
+	LastFailoverTime *metav1.Time `json:"lastFailoverTime,omitempty"`
+
 	// Conditions contain the different condition statuses.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`

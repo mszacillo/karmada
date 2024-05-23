@@ -156,6 +156,13 @@ func mergeLabel(workload *unstructured.Unstructured, binding metav1.Object, scop
 	var workLabel = make(map[string]string)
 	util.MergeLabel(workload, util.ManagedByKarmadaLabel, util.ManagedByKarmadaLabelValue)
 	if scope == apiextensionsv1.NamespaceScoped {
+		klog.V(4).Info("Checking for failover condition.")
+		namespaceBindingObj := binding.(*workv1alpha2.ResourceBinding)
+		if checkFailoverCondition(namespaceBindingObj) {
+			klog.V(4).Info("Appending failover label!")
+			util.MergeLabel(workload, "resourcebinding.karmada.io/failover", "true")
+		}
+
 		bindingID := util.GetLabelValue(binding.GetLabels(), workv1alpha2.ResourceBindingPermanentIDLabel)
 		util.MergeLabel(workload, workv1alpha2.ResourceBindingPermanentIDLabel, bindingID)
 		workLabel[workv1alpha2.ResourceBindingPermanentIDLabel] = bindingID
@@ -165,6 +172,18 @@ func mergeLabel(workload *unstructured.Unstructured, binding metav1.Object, scop
 		workLabel[workv1alpha2.ClusterResourceBindingPermanentIDLabel] = bindingID
 	}
 	return workLabel
+}
+
+func checkFailoverCondition(resourceBinding *workv1alpha2.ResourceBinding) bool {
+	conditions := resourceBinding.Status.Conditions
+	for _, condition := range conditions {
+		klog.V(4).Info("Checking condition: %s", condition.Message)
+		if condition.Type == workv1alpha2.EvictionReasonApplicationFailure {
+			return true
+		}
+
+	}
+	return false
 }
 
 func mergeAnnotations(workload *unstructured.Unstructured, workNamespace string, binding metav1.Object, scope apiextensionsv1.ResourceScope) map[string]string {
