@@ -22,7 +22,6 @@ import (
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,11 +65,12 @@ func (v *ValidatingAdmission) Handle(ctx context.Context, req admission.Request)
 	quotas := &policyv1alpha1.FederatedResourceQuotaList{}
 	listOpt := &client.ListOptions{Namespace: obj.GetNamespace()}
 	if err := v.List(ctx, quotas, listOpt); err != nil {
-		// No resource quota is found, bypass webhook
-		if apierrors.IsNotFound(err) {
-			return admission.Allowed("")
-		}
 		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	if len(quotas.Items) == 0 {
+		// No quota exists on namespace, skip webhook
+		return admission.Allowed("")
 	}
 
 	if !v.Interpreter.HookEnabled(obj.GroupVersionKind(), configv1alpha1.InterpreterOperationInterpretReplica) &&
