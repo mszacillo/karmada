@@ -174,7 +174,7 @@ func findTargetStatusItemByCluster(aggregatedStatusItems []workv1alpha2.Aggregat
 	return workv1alpha2.AggregatedStatusItem{}, false
 }
 
-func getClusterNamesFromTargetClusters(targetClusters []workv1alpha2.TargetCluster) []string {
+func GetClusterNamesFromTargetClusters(targetClusters []workv1alpha2.TargetCluster) []string {
 	if targetClusters == nil {
 		return nil
 	}
@@ -186,10 +186,31 @@ func getClusterNamesFromTargetClusters(targetClusters []workv1alpha2.TargetClust
 	return clusters
 }
 
-func buildTaskOptions(failoverBehavior *policyv1alpha1.ApplicationFailoverBehavior, aggregatedStatus []workv1alpha2.AggregatedStatusItem, cluster, producer string, clustersBeforeFailover []string) ([]workv1alpha2.Option, error) {
+func BuildTaskOptions(failoverBehavior *policyv1alpha1.FailoverBehavior, aggregatedStatus []workv1alpha2.AggregatedStatusItem, cluster, producer, reason string, clustersBeforeFailover []string) ([]workv1alpha2.Option, error) {
 	var taskOpts []workv1alpha2.Option
 	taskOpts = append(taskOpts, workv1alpha2.WithProducer(producer))
-	taskOpts = append(taskOpts, workv1alpha2.WithReason(workv1alpha2.EvictionReasonApplicationFailure))
+	taskOpts = append(taskOpts, workv1alpha2.WithReason(reason))
+
+	if failoverBehavior != nil {
+		taskOpts, err := buildTaskOptionsWithFailover(failoverBehavior.Application, aggregatedStatus, cluster, clustersBeforeFailover, taskOpts)
+		if err != nil {
+			return nil, err
+		}
+		return taskOpts, nil
+	} else {
+		if features.FeatureGate.Enabled(features.GracefulEviction) {
+			taskOpts = append(taskOpts, workv1alpha2.WithPurgeMode(policyv1alpha1.Graciously))
+		} else {
+			taskOpts = append(taskOpts, workv1alpha2.WithPurgeMode(policyv1alpha1.Immediately))
+		}
+	}
+
+	return taskOpts, nil
+}
+
+func buildTaskOptionsWithFailover(failoverBehavior *policyv1alpha1.ApplicationFailoverBehavior, aggregatedStatus []workv1alpha2.AggregatedStatusItem,
+	cluster string, clustersBeforeFailover []string, taskOpts []workv1alpha2.Option) ([]workv1alpha2.Option, error) {
+
 	taskOpts = append(taskOpts, workv1alpha2.WithPurgeMode(failoverBehavior.PurgeMode))
 
 	if features.FeatureGate.Enabled(features.StatefulFailoverInjection) {

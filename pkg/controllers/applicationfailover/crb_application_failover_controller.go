@@ -149,9 +149,10 @@ func (c *CRBApplicationFailoverController) syncBinding(ctx context.Context, bind
 }
 
 func (c *CRBApplicationFailoverController) evictBinding(binding *workv1alpha2.ClusterResourceBinding, clusters []string) error {
-	clustersBeforeFailover := getClusterNamesFromTargetClusters(binding.Spec.Clusters)
+	clustersBeforeFailover := GetClusterNamesFromTargetClusters(binding.Spec.Clusters)
 	for _, cluster := range clusters {
-		taskOpts, err := buildTaskOptions(binding.Spec.Failover.Application, binding.Status.AggregatedStatus, cluster, CRBApplicationFailoverControllerName, clustersBeforeFailover)
+		taskOpts, err := BuildTaskOptions(binding.Spec.Failover, binding.Status.AggregatedStatus, cluster,
+			CRBApplicationFailoverControllerName, workv1alpha2.EvictionReasonApplicationFailure, clustersBeforeFailover)
 		if err != nil {
 			klog.Errorf("failed to build TaskOptions for ClusterResourceBinding(%s) under Cluster(%s): %v", binding.Name, cluster, err)
 			return err

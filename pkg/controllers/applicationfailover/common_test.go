@@ -333,7 +333,7 @@ func Test_getClusterNamesFromTargetClusters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, getClusterNamesFromTargetClusters(tt.args.targetClusters), "getClusterNamesFromTargetClusters(%v)", tt.args.targetClusters)
+			assert.Equalf(t, tt.want, GetClusterNamesFromTargetClusters(tt.args.targetClusters), "getClusterNamesFromTargetClusters(%v)", tt.args.targetClusters)
 		})
 	}
 }
@@ -459,10 +459,11 @@ func Test_buildPreservedLabelState(t *testing.T) {
 
 func Test_buildTaskOptions(t *testing.T) {
 	type args struct {
-		failoverBehavior       *policyv1alpha1.ApplicationFailoverBehavior
+		failoverBehavior       *policyv1alpha1.FailoverBehavior
 		aggregatedStatus       []workv1alpha2.AggregatedStatusItem
 		cluster                string
 		producer               string
+		reason                 string
 		clustersBeforeFailover []string
 	}
 	tests := []struct {
@@ -474,16 +475,18 @@ func Test_buildTaskOptions(t *testing.T) {
 		{
 			name: "Graciously purgeMode with ResourceBinding",
 			args: args{
-				failoverBehavior: &policyv1alpha1.ApplicationFailoverBehavior{
-					DecisionConditions: policyv1alpha1.DecisionConditions{
-						TolerationSeconds: ptr.To[int32](100),
-					},
-					PurgeMode:          policyv1alpha1.Graciously,
-					GracePeriodSeconds: ptr.To[int32](120),
-					StatePreservation: &policyv1alpha1.StatePreservation{
-						Rules: []policyv1alpha1.StatePreservationRule{
-							{AliasLabelName: "key-a", JSONPath: "{ .replicas }"},
-							{AliasLabelName: "key-b", JSONPath: "{ .health }"},
+				failoverBehavior: &policyv1alpha1.FailoverBehavior{
+					Application: &policyv1alpha1.ApplicationFailoverBehavior{
+						DecisionConditions: policyv1alpha1.DecisionConditions{
+							TolerationSeconds: ptr.To[int32](100),
+						},
+						PurgeMode:          policyv1alpha1.Graciously,
+						GracePeriodSeconds: ptr.To[int32](120),
+						StatePreservation: &policyv1alpha1.StatePreservation{
+							Rules: []policyv1alpha1.StatePreservationRule{
+								{AliasLabelName: "key-a", JSONPath: "{ .replicas }"},
+								{AliasLabelName: "key-b", JSONPath: "{ .health }"},
+							},
 						},
 					},
 				},
@@ -493,6 +496,7 @@ func Test_buildTaskOptions(t *testing.T) {
 				},
 				cluster:                "c1",
 				producer:               RBApplicationFailoverControllerName,
+				reason:                 workv1alpha2.EvictionReasonApplicationFailure,
 				clustersBeforeFailover: []string{"c0"},
 			},
 			want: *workv1alpha2.NewTaskOptions(
@@ -507,15 +511,17 @@ func Test_buildTaskOptions(t *testing.T) {
 		{
 			name: "Never purgeMode with ClusterResourceBinding",
 			args: args{
-				failoverBehavior: &policyv1alpha1.ApplicationFailoverBehavior{
-					DecisionConditions: policyv1alpha1.DecisionConditions{
-						TolerationSeconds: ptr.To[int32](100),
-					},
-					PurgeMode: policyv1alpha1.Never,
-					StatePreservation: &policyv1alpha1.StatePreservation{
-						Rules: []policyv1alpha1.StatePreservationRule{
-							{AliasLabelName: "key-a", JSONPath: "{ .replicas }"},
-							{AliasLabelName: "key-b", JSONPath: "{ .health }"},
+				failoverBehavior: &policyv1alpha1.FailoverBehavior{
+					Application: &policyv1alpha1.ApplicationFailoverBehavior{
+						DecisionConditions: policyv1alpha1.DecisionConditions{
+							TolerationSeconds: ptr.To[int32](100),
+						},
+						PurgeMode: policyv1alpha1.Never,
+						StatePreservation: &policyv1alpha1.StatePreservation{
+							Rules: []policyv1alpha1.StatePreservationRule{
+								{AliasLabelName: "key-a", JSONPath: "{ .replicas }"},
+								{AliasLabelName: "key-b", JSONPath: "{ .health }"},
+							},
 						},
 					},
 				},
@@ -525,6 +531,7 @@ func Test_buildTaskOptions(t *testing.T) {
 				},
 				cluster:                "c1",
 				producer:               CRBApplicationFailoverControllerName,
+				reason:                 workv1alpha2.EvictionReasonApplicationFailure,
 				clustersBeforeFailover: []string{"c0"},
 			},
 			want: *workv1alpha2.NewTaskOptions(
@@ -539,15 +546,17 @@ func Test_buildTaskOptions(t *testing.T) {
 		{
 			name: "Immediately purgeMode with ClusterResourceBinding",
 			args: args{
-				failoverBehavior: &policyv1alpha1.ApplicationFailoverBehavior{
-					DecisionConditions: policyv1alpha1.DecisionConditions{
-						TolerationSeconds: ptr.To[int32](100),
-					},
-					PurgeMode: policyv1alpha1.Immediately,
-					StatePreservation: &policyv1alpha1.StatePreservation{
-						Rules: []policyv1alpha1.StatePreservationRule{
-							{AliasLabelName: "key-a", JSONPath: "{ .replicas }"},
-							{AliasLabelName: "key-b", JSONPath: "{ .health }"},
+				failoverBehavior: &policyv1alpha1.FailoverBehavior{
+					Application: &policyv1alpha1.ApplicationFailoverBehavior{
+						DecisionConditions: policyv1alpha1.DecisionConditions{
+							TolerationSeconds: ptr.To[int32](100),
+						},
+						PurgeMode: policyv1alpha1.Immediately,
+						StatePreservation: &policyv1alpha1.StatePreservation{
+							Rules: []policyv1alpha1.StatePreservationRule{
+								{AliasLabelName: "key-a", JSONPath: "{ .replicas }"},
+								{AliasLabelName: "key-b", JSONPath: "{ .health }"},
+							},
 						},
 					},
 				},
@@ -557,6 +566,7 @@ func Test_buildTaskOptions(t *testing.T) {
 				},
 				cluster:                "c1",
 				producer:               CRBApplicationFailoverControllerName,
+				reason:                 workv1alpha2.EvictionReasonApplicationFailure,
 				clustersBeforeFailover: []string{"c0"},
 			},
 			want: *workv1alpha2.NewTaskOptions(
@@ -570,12 +580,14 @@ func Test_buildTaskOptions(t *testing.T) {
 		{
 			name: "Graciously purgeMode with ResourceBinding, StatePreservation is nil",
 			args: args{
-				failoverBehavior: &policyv1alpha1.ApplicationFailoverBehavior{
-					DecisionConditions: policyv1alpha1.DecisionConditions{
-						TolerationSeconds: ptr.To[int32](100),
+				failoverBehavior: &policyv1alpha1.FailoverBehavior{
+					Application: &policyv1alpha1.ApplicationFailoverBehavior{
+						DecisionConditions: policyv1alpha1.DecisionConditions{
+							TolerationSeconds: ptr.To[int32](100),
+						},
+						PurgeMode:          policyv1alpha1.Graciously,
+						GracePeriodSeconds: ptr.To[int32](120),
 					},
-					PurgeMode:          policyv1alpha1.Graciously,
-					GracePeriodSeconds: ptr.To[int32](120),
 				},
 				aggregatedStatus: []workv1alpha2.AggregatedStatusItem{
 					{ClusterName: "c1", Status: &runtime.RawExtension{Raw: []byte(`{"replicas": 2, "health": true}`)}},
@@ -583,6 +595,7 @@ func Test_buildTaskOptions(t *testing.T) {
 				},
 				cluster:                "c1",
 				producer:               RBApplicationFailoverControllerName,
+				reason:                 workv1alpha2.EvictionReasonApplicationFailure,
 				clustersBeforeFailover: []string{"c0"},
 			},
 			want: *workv1alpha2.NewTaskOptions(
@@ -595,13 +608,15 @@ func Test_buildTaskOptions(t *testing.T) {
 		{
 			name: "Graciously purgeMode with ResourceBinding, StatePreservation.Rules is nil",
 			args: args{
-				failoverBehavior: &policyv1alpha1.ApplicationFailoverBehavior{
-					DecisionConditions: policyv1alpha1.DecisionConditions{
-						TolerationSeconds: ptr.To[int32](100),
+				failoverBehavior: &policyv1alpha1.FailoverBehavior{
+					Application: &policyv1alpha1.ApplicationFailoverBehavior{
+						DecisionConditions: policyv1alpha1.DecisionConditions{
+							TolerationSeconds: ptr.To[int32](100),
+						},
+						PurgeMode:          policyv1alpha1.Graciously,
+						GracePeriodSeconds: ptr.To[int32](120),
+						StatePreservation:  &policyv1alpha1.StatePreservation{},
 					},
-					PurgeMode:          policyv1alpha1.Graciously,
-					GracePeriodSeconds: ptr.To[int32](120),
-					StatePreservation:  &policyv1alpha1.StatePreservation{},
 				},
 				aggregatedStatus: []workv1alpha2.AggregatedStatusItem{
 					{ClusterName: "c1", Status: &runtime.RawExtension{Raw: []byte(`{"replicas": 2, "health": true}`)}},
@@ -609,6 +624,7 @@ func Test_buildTaskOptions(t *testing.T) {
 				},
 				cluster:                "c1",
 				producer:               RBApplicationFailoverControllerName,
+				reason:                 workv1alpha2.EvictionReasonApplicationFailure,
 				clustersBeforeFailover: []string{"c0"},
 			},
 			want: *workv1alpha2.NewTaskOptions(
@@ -621,16 +637,18 @@ func Test_buildTaskOptions(t *testing.T) {
 		{
 			name: "Graciously purgeMode with ResourceBinding, target cluster status in not collected",
 			args: args{
-				failoverBehavior: &policyv1alpha1.ApplicationFailoverBehavior{
-					DecisionConditions: policyv1alpha1.DecisionConditions{
-						TolerationSeconds: ptr.To[int32](100),
-					},
-					PurgeMode:          policyv1alpha1.Graciously,
-					GracePeriodSeconds: ptr.To[int32](120),
-					StatePreservation: &policyv1alpha1.StatePreservation{
-						Rules: []policyv1alpha1.StatePreservationRule{
-							{AliasLabelName: "key-a", JSONPath: "{ .replicas }"},
-							{AliasLabelName: "key-b", JSONPath: "{ .health }"},
+				failoverBehavior: &policyv1alpha1.FailoverBehavior{
+					Application: &policyv1alpha1.ApplicationFailoverBehavior{
+						DecisionConditions: policyv1alpha1.DecisionConditions{
+							TolerationSeconds: ptr.To[int32](100),
+						},
+						PurgeMode:          policyv1alpha1.Graciously,
+						GracePeriodSeconds: ptr.To[int32](120),
+						StatePreservation: &policyv1alpha1.StatePreservation{
+							Rules: []policyv1alpha1.StatePreservationRule{
+								{AliasLabelName: "key-a", JSONPath: "{ .replicas }"},
+								{AliasLabelName: "key-b", JSONPath: "{ .health }"},
+							},
 						},
 					},
 				},
@@ -640,6 +658,7 @@ func Test_buildTaskOptions(t *testing.T) {
 				},
 				cluster:                "c1",
 				producer:               RBApplicationFailoverControllerName,
+				reason:                 workv1alpha2.EvictionReasonApplicationFailure,
 				clustersBeforeFailover: []string{"c0"},
 			},
 			wantErr: assert.Error,
@@ -649,12 +668,12 @@ func Test_buildTaskOptions(t *testing.T) {
 		err := features.FeatureGate.Set(fmt.Sprintf("%s=%t", features.StatefulFailoverInjection, true))
 		assert.NoError(t, err)
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := buildTaskOptions(tt.args.failoverBehavior, tt.args.aggregatedStatus, tt.args.cluster, tt.args.producer, tt.args.clustersBeforeFailover)
-			if !tt.wantErr(t, err, fmt.Sprintf("buildTaskOptions(%v, %v, %v, %v, %v)", tt.args.failoverBehavior, tt.args.aggregatedStatus, tt.args.cluster, tt.args.producer, tt.args.clustersBeforeFailover)) {
+			got, err := BuildTaskOptions(tt.args.failoverBehavior, tt.args.aggregatedStatus, tt.args.cluster, tt.args.producer, tt.args.reason, tt.args.clustersBeforeFailover)
+			if !tt.wantErr(t, err, fmt.Sprintf("buildTaskOptions(%v, %v, %v, %v, %v)", tt.args.failoverBehavior, tt.args.cluster, tt.args.producer, tt.args.reason, tt.args.clustersBeforeFailover)) {
 				return
 			}
 			gotTaskOptions := workv1alpha2.NewTaskOptions(got...)
-			assert.Equalf(t, tt.want, *gotTaskOptions, "buildTaskOptions(%v, %v, %v, %v, %v)", tt.args.failoverBehavior, tt.args.aggregatedStatus, tt.args.cluster, tt.args.producer, tt.args.clustersBeforeFailover)
+			assert.Equalf(t, tt.want, *gotTaskOptions, "buildTaskOptions(%v, %v, %v, %v, %v)", tt.args.failoverBehavior, tt.args.cluster, tt.args.producer, tt.args.reason, tt.args.clustersBeforeFailover)
 		})
 	}
 }

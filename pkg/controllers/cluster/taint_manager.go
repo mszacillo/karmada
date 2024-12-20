@@ -32,9 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	clusterv1alpha1 "github.com/karmada-io/karmada/pkg/apis/cluster/v1alpha1"
-	policyv1alpha1 "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1"
 	workv1alpha2 "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2"
-	"github.com/karmada-io/karmada/pkg/features"
+	"github.com/karmada-io/karmada/pkg/controllers/applicationfailover"
 	"github.com/karmada-io/karmada/pkg/util"
 	"github.com/karmada-io/karmada/pkg/util/fedinformer/keys"
 	"github.com/karmada-io/karmada/pkg/util/helper"
@@ -171,18 +170,16 @@ func (tc *NoExecuteTaintManager) syncBindingEviction(key util.QueueKey) error {
 	// Case 2: Need eviction after toleration time. If time is up, do eviction right now.
 	// Case 3: Tolerate forever, we do nothing.
 	if needEviction || tolerationTime == 0 {
-		// update final result to evict the target cluster
-		if features.FeatureGate.Enabled(features.GracefulEviction) {
-			binding.Spec.GracefulEvictCluster(cluster, workv1alpha2.NewTaskOptions(
-				workv1alpha2.WithPurgeMode(policyv1alpha1.Graciously),
-				workv1alpha2.WithProducer(workv1alpha2.EvictionProducerTaintManager),
-				workv1alpha2.WithReason(workv1alpha2.EvictionReasonTaintUntolerated)))
-		} else {
-			binding.Spec.GracefulEvictCluster(cluster, workv1alpha2.NewTaskOptions(
-				workv1alpha2.WithPurgeMode(policyv1alpha1.Immediately),
-				workv1alpha2.WithProducer(workv1alpha2.EvictionProducerTaintManager),
-				workv1alpha2.WithReason(workv1alpha2.EvictionReasonTaintUntolerated)))
+		clustersBeforeFailover := applicationfailover.GetClusterNamesFromTargetClusters(binding.Spec.Clusters)
+		taskOpts, err := applicationfailover.BuildTaskOptions(binding.Spec.Failover, binding.Status.AggregatedStatus, cluster,
+			TaintManagerName, workv1alpha2.EvictionReasonTaintUntolerated, clustersBeforeFailover)
+		if err != nil {
+			klog.Errorf("failed to build TaskOptions for ResourceBinding(%s/%s) under Cluster(%s): %v", binding.Namespace, binding.Name, cluster, err)
+			return err
 		}
+		// update final result to evict the target cluster
+		binding.Spec.GracefulEvictCluster(cluster, workv1alpha2.NewTaskOptions(taskOpts...))
+
 		if err = tc.Update(context.TODO(), binding); err != nil {
 			helper.EmitClusterEvictionEventForResourceBinding(binding, cluster, tc.EventRecorder, err)
 			klog.ErrorS(err, "Failed to update binding", "binding", klog.KObj(binding))
@@ -230,18 +227,15 @@ func (tc *NoExecuteTaintManager) syncClusterBindingEviction(key util.QueueKey) e
 	// Case 2: Need eviction after toleration time. If time is up, do eviction right now.
 	// Case 3: Tolerate forever, we do nothing.
 	if needEviction || tolerationTime == 0 {
-		// update final result to evict the target cluster
-		if features.FeatureGate.Enabled(features.GracefulEviction) {
-			binding.Spec.GracefulEvictCluster(cluster, workv1alpha2.NewTaskOptions(
-				workv1alpha2.WithPurgeMode(policyv1alpha1.Graciously),
-				workv1alpha2.WithProducer(workv1alpha2.EvictionProducerTaintManager),
-				workv1alpha2.WithReason(workv1alpha2.EvictionReasonTaintUntolerated)))
-		} else {
-			binding.Spec.GracefulEvictCluster(cluster, workv1alpha2.NewTaskOptions(
-				workv1alpha2.WithPurgeMode(policyv1alpha1.Immediately),
-				workv1alpha2.WithProducer(workv1alpha2.EvictionProducerTaintManager),
-				workv1alpha2.WithReason(workv1alpha2.EvictionReasonTaintUntolerated)))
+		clustersBeforeFailover := applicationfailover.GetClusterNamesFromTargetClusters(binding.Spec.Clusters)
+		taskOpts, err := applicationfailover.BuildTaskOptions(binding.Spec.Failover, binding.Status.AggregatedStatus, cluster,
+			TaintManagerName, workv1alpha2.EvictionReasonTaintUntolerated, clustersBeforeFailover)
+		if err != nil {
+			klog.Errorf("failed to build TaskOptions for ResourceBinding(%s/%s) under Cluster(%s): %v", binding.Namespace, binding.Name, cluster, err)
+			return err
 		}
+		// update final result to evict the target cluster
+		binding.Spec.GracefulEvictCluster(cluster, workv1alpha2.NewTaskOptions(taskOpts...))
 		if err = tc.Update(context.TODO(), binding); err != nil {
 			helper.EmitClusterEvictionEventForClusterResourceBinding(binding, cluster, tc.EventRecorder, err)
 			klog.ErrorS(err, "Failed to update cluster binding", "binding", binding.Name)
