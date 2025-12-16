@@ -127,6 +127,9 @@ const (
 	// owner: @zach593
 	// alpha: v1.15
 	ControllerPriorityQueue featuregate.Feature = "ControllerPriorityQueue"
+
+	// WorkloadAffinity controls whether Karmada scheduler will take workload affinity / anti-affinity terms into account.
+	WorkloadAffinity featuregate.Feature = "WorkloadAffinity"
 )
 
 var (
@@ -154,6 +157,7 @@ var (
 		ContextualLogging:                 {Default: true, PreRelease: featuregate.Beta},
 		MultiplePodTemplatesScheduling:    {Default: false, PreRelease: featuregate.Alpha},
 		ControllerPriorityQueue:           {Default: false, PreRelease: featuregate.Alpha},
+		WorkloadAffinity:                  {Default: false, PreRelease: featuregate.Alpha},
 	}
 )
 

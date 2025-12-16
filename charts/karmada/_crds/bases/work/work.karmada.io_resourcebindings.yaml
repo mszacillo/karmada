@@ -1263,6 +1263,82 @@ spec:
                           type: string
                       type: object
                     type: array
+                  workloadAffinity:
+                    description: WorkloadAffinity represents the inter-workload affinty
+                      / anti-affinity rules.
+                    properties:
+                      affinity:
+                        description: |-
+                          Affinity represents the inter-workload affinity scheduling rules.
+                          These are hard requirements - workloads will only be scheduled to clusters that
+                          satisfy the affinity term if specified.
+                        properties:
+                          allowBootstrap:
+                            default: true
+                            description: |-
+                              AllowBootstrap controls whether this workload can be scheduled when no workloads
+                              with the same affinity group currently exist in the system.
+
+                              It defaults to true, which means the affinity requirement is relaxed for the first workload of
+                              a group - if no existing workloads with the same affinity group are found, the scheduler will not
+                              block scheduling. This allows bootstrapping new workload groups without
+                              encountering scheduling deadlocks, providing the best user experience out of the box.
+
+                              When set to false, strict affinity enforcement is applied - the workload
+                              will only be scheduled if workloads with the same affinity group already exist in the system.
+                            type: boolean
+                          requireSameGroup:
+                            description: |-
+                              RequireSameGroup indicates the workload should co-locate with workloads
+                              that share the same affinity group. When enabled, the scheduler will only
+                              permit clusters where workloads with the same affinity group already exist.
+
+                              This field is required currently as more expressive selectors are not yet
+                              supported. When additional selector fields are introduced in the future,
+                              this field will be made optional to allow alternative affinity matching strategies.
+                            enum:
+                            - true
+                            type: boolean
+                        required:
+                        - requireSameGroup
+                        type: object
+                      affinityLabelKey:
+                        description: |-
+                          AffinityLabelKey declares the label key on the workload template that exposes
+                          its affinity identity. The label value under this key represents the
+                          workload's group identifier that other workloads can match against.
+
+                          Only a single key is supported initially. If multiple keys are needed in
+                          the future, a new field (e.g., labelKeys) can be added without breaking
+                          compatibility.
+
+                          The key must be a valid Kubernetes label key.
+                        type: string
+                      antiAffinity:
+                        description: |-
+                          AntiAffinity represents the inter-workload anti-affinity scheduling rules.
+                          These are hard requirements - workloads will be scheduled to avoid clusters
+                          where matching workloads are already scheduled.
+                        properties:
+                          rejectSameGroup:
+                            description: |-
+                              RejectSameGroup indicates the workload should reject co-locating with workloads
+                              that share the same affinity group. When enabled, the scheduler will reject
+                              clusters where workloads with the same affinity group already exist.
+                              This is a hard constraint - workloads will not be scheduled to such clusters.
+
+                              This field is required currently as more expressive selectors are not yet
+                              supported. When additional selector fields are introduced in the future,
+                              this field will be made optional to allow alternative anti-affinity matching strategies.
+                            enum:
+                            - true
+                            type: boolean
+                        required:
+                        - rejectSameGroup
+                        type: object
+                    required:
+                    - affinityLabelKey
+                    type: object
                 type: object
               preserveResourcesOnDeletion:
                 description: |-
@@ -1498,6 +1574,11 @@ spec:
               resource:
                 description: Resource represents the Kubernetes resource to be propagated.
                 properties:
+                  affinityGroupLabel:
+                    additionalProperties:
+                      type: string
+                    description: Label used for affinity
+                    type: object
                   apiVersion:
                     description: APIVersion represents the API version of the referent.
                     type: string
@@ -1523,6 +1604,7 @@ spec:
                     description: UID of the referent.
                     type: string
                 required:
+                - affinityGroupLabel
                 - apiVersion
                 - kind
                 - name

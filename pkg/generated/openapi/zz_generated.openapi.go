@@ -143,6 +143,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.SuspendClusters":                             schema_pkg_apis_policy_v1alpha1_SuspendClusters(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.Suspension":                                  schema_pkg_apis_policy_v1alpha1_Suspension(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.Taint":                                       schema_pkg_apis_policy_v1alpha1_Taint(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAffinity":                            schema_pkg_apis_policy_v1alpha1_WorkloadAffinity(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAffinityTerm":                        schema_pkg_apis_policy_v1alpha1_WorkloadAffinityTerm(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAntiAffinityTerm":                    schema_pkg_apis_policy_v1alpha1_WorkloadAntiAffinityTerm(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.YAMLPatchOperation":                          schema_pkg_apis_policy_v1alpha1_YAMLPatchOperation(ref),
 		"github.com/karmada-io/karmada/pkg/apis/remedy/v1alpha1.ClusterAffinity":                             schema_pkg_apis_remedy_v1alpha1_ClusterAffinity(ref),
 		"github.com/karmada-io/karmada/pkg/apis/remedy/v1alpha1.ClusterConditionRequirement":                 schema_pkg_apis_remedy_v1alpha1_ClusterConditionRequirement(ref),
@@ -5061,11 +5064,17 @@ func schema_pkg_apis_policy_v1alpha1_Placement(ref common.ReferenceCallback) com
 							Ref:         ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ReplicaSchedulingStrategy"),
 						},
 					},
+					"workloadAffinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WorkloadAffinity represents the inter-workload affinty / anti-affinity rules.",
+							Ref:         ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAffinity"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ClusterAffinity", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ClusterAffinityTerm", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ReplicaSchedulingStrategy", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.SpreadConstraint", "k8s.io/api/core/v1.Toleration"},
+			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ClusterAffinity", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ClusterAffinityTerm", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ReplicaSchedulingStrategy", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.SpreadConstraint", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAffinity", "k8s.io/api/core/v1.Toleration"},
 	}
 }
 
@@ -5731,6 +5740,91 @@ func schema_pkg_apis_policy_v1alpha1_Taint(ref common.ReferenceCallback) common.
 					},
 				},
 				Required: []string{"key", "effect"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_policy_v1alpha1_WorkloadAffinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadAffinity defines inter-workload affinity and anti-affinity rules.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"affinityLabelKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AffinityLabelKey declares the label key on the workload template that exposes its affinity identity. The label value under this key represents the workload's group identifier that other workloads can match against.\n\nOnly a single key is supported initially. If multiple keys are needed in the future, a new field (e.g., labelKeys) can be added without breaking compatibility.\n\nThe key must be a valid Kubernetes label key.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"affinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Affinity represents the inter-workload affinity scheduling rules. These are hard requirements - workloads will only be scheduled to clusters that satisfy the affinity term if specified.",
+							Ref:         ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAffinityTerm"),
+						},
+					},
+					"antiAffinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AntiAffinity represents the inter-workload anti-affinity scheduling rules. These are hard requirements - workloads will be scheduled to avoid clusters where matching workloads are already scheduled.",
+							Ref:         ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAntiAffinityTerm"),
+						},
+					},
+				},
+				Required: []string{"affinityLabelKey"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAffinityTerm", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.WorkloadAntiAffinityTerm"},
+	}
+}
+
+func schema_pkg_apis_policy_v1alpha1_WorkloadAffinityTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadAffinityTerm defines affinity rules for co-locating with specific workload groups.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"requireSameGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RequireSameGroup indicates the workload should co-locate with workloads that share the same affinity group. When enabled, the scheduler will only permit clusters where workloads with the same affinity group already exist.\n\nThis field is required currently as more expressive selectors are not yet supported. When additional selector fields are introduced in the future, this field will be made optional to allow alternative affinity matching strategies.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"allowBootstrap": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllowBootstrap controls whether this workload can be scheduled when no workloads with the same affinity group currently exist in the system.\n\nIt defaults to true, which means the affinity requirement is relaxed for the first workload of a group - if no existing workloads with the same affinity group are found, the scheduler will not block scheduling. This allows bootstrapping new workload groups without encountering scheduling deadlocks, providing the best user experience out of the box.\n\nWhen set to false, strict affinity enforcement is applied - the workload will only be scheduled if workloads with the same affinity group already exist in the system.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"requireSameGroup"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_policy_v1alpha1_WorkloadAntiAffinityTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadAntiAffinityTerm defines anti-affinity rules for separating from specific workload groups.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"rejectSameGroup": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RejectSameGroup indicates the workload should reject co-locating with workloads that share the same affinity group. When enabled, the scheduler will reject clusters where workloads with the same affinity group already exist. This is a hard constraint - workloads will not be scheduled to such clusters.\n\nThis field is required currently as more expressive selectors are not yet supported. When additional selector fields are introduced in the future, this field will be made optional to allow alternative anti-affinity matching strategies.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"rejectSameGroup"},
 			},
 		},
 	}
@@ -7551,6 +7645,22 @@ func schema_pkg_apis_work_v1alpha2_ObjectReference(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"affinityGroupLabel": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Label used for affinity",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
 							Description: "UID of the referent.",
@@ -7566,7 +7676,7 @@ func schema_pkg_apis_work_v1alpha2_ObjectReference(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"apiVersion", "kind", "name"},
+				Required: []string{"apiVersion", "kind", "name", "affinityGroupLabel"},
 			},
 		},
 	}

@@ -20122,6 +20122,10 @@
             "default": {},
             "$ref": "#/definitions/com.github.karmada-io.karmada.pkg.apis.policy.v1alpha1.SpreadConstraint"
           }
+        },
+        "workloadAffinity": {
+          "description": "WorkloadAffinity represents the inter-workload affinty / anti-affinity rules.",
+          "$ref": "#/definitions/com.github.karmada-io.karmada.pkg.apis.policy.v1alpha1.WorkloadAffinity"
         }
       }
     },
@@ -20542,6 +20546,58 @@
         "value": {
           "description": "Value represents the taint value corresponding to the taint key.",
           "type": "string"
+        }
+      }
+    },
+    "com.github.karmada-io.karmada.pkg.apis.policy.v1alpha1.WorkloadAffinity": {
+      "description": "WorkloadAffinity defines inter-workload affinity and anti-affinity rules.",
+      "type": "object",
+      "required": [
+        "affinityLabelKey"
+      ],
+      "properties": {
+        "affinity": {
+          "description": "Affinity represents the inter-workload affinity scheduling rules. These are hard requirements - workloads will only be scheduled to clusters that satisfy the affinity term if specified.",
+          "$ref": "#/definitions/com.github.karmada-io.karmada.pkg.apis.policy.v1alpha1.WorkloadAffinityTerm"
+        },
+        "affinityLabelKey": {
+          "description": "AffinityLabelKey declares the label key on the workload template that exposes its affinity identity. The label value under this key represents the workload's group identifier that other workloads can match against.\n\nOnly a single key is supported initially. If multiple keys are needed in the future, a new field (e.g., labelKeys) can be added without breaking compatibility.\n\nThe key must be a valid Kubernetes label key.",
+          "type": "string",
+          "default": ""
+        },
+        "antiAffinity": {
+          "description": "AntiAffinity represents the inter-workload anti-affinity scheduling rules. These are hard requirements - workloads will be scheduled to avoid clusters where matching workloads are already scheduled.",
+          "$ref": "#/definitions/com.github.karmada-io.karmada.pkg.apis.policy.v1alpha1.WorkloadAntiAffinityTerm"
+        }
+      }
+    },
+    "com.github.karmada-io.karmada.pkg.apis.policy.v1alpha1.WorkloadAffinityTerm": {
+      "description": "WorkloadAffinityTerm defines affinity rules for co-locating with specific workload groups.",
+      "type": "object",
+      "required": [
+        "requireSameGroup"
+      ],
+      "properties": {
+        "allowBootstrap": {
+          "description": "AllowBootstrap controls whether this workload can be scheduled when no workloads with the same affinity group currently exist in the system.\n\nIt defaults to true, which means the affinity requirement is relaxed for the first workload of a group - if no existing workloads with the same affinity group are found, the scheduler will not block scheduling. This allows bootstrapping new workload groups without encountering scheduling deadlocks, providing the best user experience out of the box.\n\nWhen set to false, strict affinity enforcement is applied - the workload will only be scheduled if workloads with the same affinity group already exist in the system.",
+          "type": "boolean"
+        },
+        "requireSameGroup": {
+          "description": "RequireSameGroup indicates the workload should co-locate with workloads that share the same affinity group. When enabled, the scheduler will only permit clusters where workloads with the same affinity group already exist.\n\nThis field is required currently as more expressive selectors are not yet supported. When additional selector fields are introduced in the future, this field will be made optional to allow alternative affinity matching strategies.",
+          "type": "boolean"
+        }
+      }
+    },
+    "com.github.karmada-io.karmada.pkg.apis.policy.v1alpha1.WorkloadAntiAffinityTerm": {
+      "description": "WorkloadAntiAffinityTerm defines anti-affinity rules for separating from specific workload groups.",
+      "type": "object",
+      "required": [
+        "rejectSameGroup"
+      ],
+      "properties": {
+        "rejectSameGroup": {
+          "description": "RejectSameGroup indicates the workload should reject co-locating with workloads that share the same affinity group. When enabled, the scheduler will reject clusters where workloads with the same affinity group already exist. This is a hard constraint - workloads will not be scheduled to such clusters.\n\nThis field is required currently as more expressive selectors are not yet supported. When additional selector fields are introduced in the future, this field will be made optional to allow alternative anti-affinity matching strategies.",
+          "type": "boolean"
         }
       }
     },
@@ -21359,9 +21415,18 @@
       "required": [
         "apiVersion",
         "kind",
-        "name"
+        "name",
+        "affinityGroupLabel"
       ],
       "properties": {
+        "affinityGroupLabel": {
+          "description": "Label used for affinity",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "default": ""
+          }
+        },
         "apiVersion": {
           "description": "APIVersion represents the API version of the referent.",
           "type": "string",
